@@ -1,0 +1,667 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Analysis Results | NAFDAC Compliance</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Playfair+Display:ital,wght@0,600;0,700;1,600&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                        serif: ['Playfair Display', 'serif'],
+                        mono: ['JetBrains Mono', 'monospace'],
+                    },
+                    colors: {
+                        stone: { 50: '#fdfbf7' },
+                        emerald: { 950: '#022c22' }
+                    }
+                }
+            }
+        }
+    </script>
+    <script>
+        // Initialize theme early to prevent flash
+        if (localStorage.theme === 'dark' || (!('theme' in localStorage) && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+            document.documentElement.classList.add('dark')
+        } else {
+            document.documentElement.classList.remove('dark')
+        }
+        function toggleTheme() {
+            document.documentElement.classList.toggle('dark');
+            if (document.documentElement.classList.contains('dark')) {
+                localStorage.theme = 'dark';
+            } else {
+                localStorage.theme = 'light';
+            }
+        }
+    </script>
+</head>
+<body class="bg-stone-50 dark:bg-slate-900 text-emerald-950 dark:text-stone-50 min-h-screen pb-20 relative overflow-x-hidden transition-colors duration-300">
+    <!-- Background Decoration -->
+    <div class="absolute top-0 left-0 w-full h-96 bg-gradient-to-b from-emerald-900/5 dark:from-emerald-900/20 to-transparent -z-10"></div>
+    <div class="absolute top-[-10%] right-[-5%] w-96 h-96 bg-emerald-500/10 dark:bg-emerald-500/5 rounded-full blur-3xl -z-10"></div>
+
+    <header class="bg-white/70 dark:bg-slate-900/70 backdrop-blur-md border-b border-emerald-950/10 dark:border-slate-700/50 py-4 sticky top-0 z-30 shadow-sm transition-colors duration-300">
+        <div class="container mx-auto px-4 flex justify-between items-center">
+            <div class="flex items-center gap-4">
+                <img src="{{ url_for('static', filename='nafdac-logo.png') }}" alt="Logo" class="h-10 hover:scale-105 transition-transform">
+                <h1 class="font-serif font-bold text-emerald-950 dark:text-stone-50 hidden md:block text-xl tracking-tight">Compliance Analysis</h1>
+            </div>
+            <div class="flex gap-3 items-center">
+                <button onclick="toggleTheme()" class="p-2 text-emerald-950/60 dark:text-stone-50/60 hover:text-emerald-700 dark:hover:text-emerald-400 transition-colors rounded-full hover:bg-emerald-50 dark:hover:bg-slate-800" aria-label="Toggle Dark Mode">
+                    <i data-lucide="moon" class="h-5 w-5 hidden dark:block"></i>
+                    <i data-lucide="sun" class="h-5 w-5 block dark:hidden"></i>
+                </button>
+                <a href="/" class="text-sm font-medium text-emerald-950/60 dark:text-stone-50/60 hover:text-emerald-700 dark:hover:text-emerald-400 px-3 py-2 transition-colors flex items-center gap-2">
+                    <i data-lucide="plus-circle" class="h-4 w-4"></i>
+                    <span class="hidden sm:inline">New Analysis</span>
+                </a>
+                <button onclick="exportReport()" class="bg-emerald-950 hover:bg-emerald-800 active:scale-95 text-white text-sm font-bold px-5 py-2 rounded-lg transition-all flex items-center gap-2 shadow-md shadow-emerald-900/20">
+                    <i data-lucide="download" class="h-4 w-4"></i>
+                    <span class="font-serif tracking-wide">Export Report</span>
+                </button>
+                <form id="exportForm" action="{{ url_for('download_report') }}" method="POST" class="hidden">
+                    <input type="hidden" name="modified_issues" id="modifiedIssuesInput">
+                </form>
+            </div>
+        </div>
+    </header>
+
+    <main class="container mx-auto px-4 py-8 max-w-6xl">
+        {% if results.error %}
+            <div class="bg-white/80 backdrop-blur-sm rounded-2xl shadow-xl border border-red-100 p-8 text-center animate-slide-up max-w-2xl mx-auto">
+                <div class="bg-red-50 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4 border border-red-100">
+                    <i data-lucide="alert-triangle" class="text-red-600 h-8 w-8"></i>
+                </div>
+                <h2 class="text-2xl font-serif font-bold text-emerald-950 mb-2">Analysis Failed</h2>
+                <p class="text-emerald-950/70 mb-6 font-mono text-sm">{{ results.error }}</p>
+                <a href="/" class="inline-flex items-center gap-2 text-emerald-700 font-bold hover:underline active:scale-95 transition-transform">
+                    <i data-lucide="arrow-left" class="h-4 w-4"></i>
+                    Try Again
+                </a>
+            </div>
+        {% else %}
+            <!-- Status Hero -->
+            <section class="bg-white dark:bg-slate-800 rounded-2xl shadow-xl border border-emerald-950/10 dark:border-slate-700 p-8 mb-8 animate-slide-up relative overflow-hidden transition-colors duration-300">
+                <div class="absolute top-0 left-0 w-1 h-full bg-gradient-to-b from-emerald-400 to-emerald-700"></div>
+                <div class="flex flex-col md:flex-row md:items-center justify-between gap-6 pl-4">
+                    <div>
+                        <p class="text-[10px] font-bold text-emerald-950/40 dark:text-stone-50/40 uppercase tracking-widest mb-1 font-mono">Product Name</p>
+                        <h2 class="text-3xl font-serif font-bold text-emerald-950 dark:text-stone-50">{{ results.product_name }}</h2>
+                    </div>
+                    <div class="flex flex-col items-start md:items-end">
+                        <p class="text-[10px] font-bold text-emerald-950/40 dark:text-stone-50/40 uppercase tracking-widest mb-2 font-mono">Status</p>
+                        {% if results.compliance_status == 'Compliant' %}
+                            <span class="inline-flex items-center gap-2 px-6 py-2 bg-emerald-50 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400 rounded-full font-bold text-lg border border-emerald-200/50 dark:border-emerald-800 shadow-sm">
+                                <i data-lucide="check-circle" class="h-6 w-6"></i>
+                                Compliant
+                            </span>
+                        {% else %}
+                            <span class="inline-flex items-center gap-2 px-6 py-2 bg-rose-50 dark:bg-rose-900/30 text-rose-700 dark:text-rose-400 rounded-full font-bold text-lg border border-rose-200/50 dark:border-rose-800 shadow-sm">
+                                <i data-lucide="x-circle" class="h-6 w-6"></i>
+                                Non-Compliant
+                            </span>
+                        {% endif %}
+                    </div>
+                </div>
+            </section>
+
+            <div class="lg:grid lg:grid-cols-12 lg:gap-8 items-start">
+                <!-- Left Column: Ingredients (Sticky) -->
+                <div class="lg:col-span-4 lg:sticky lg:top-24 space-y-6 mb-8 lg:mb-0">
+                    <section class="bg-white dark:bg-slate-800 rounded-2xl shadow-xl border border-emerald-950/10 dark:border-slate-700 p-6 animate-slide-up relative overflow-hidden transition-colors duration-300" style="animation-delay: 0.1s">
+                        <div class="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-emerald-400 to-emerald-600"></div>
+                        <div class="flex items-center gap-2 mb-4">
+                            <i data-lucide="beaker" class="text-emerald-600 dark:text-emerald-400 h-5 w-5"></i>
+                            <h3 class="font-bold text-emerald-950 dark:text-stone-50 font-serif text-lg">Ingredients</h3>
+                        </div>
+                        <div class="flex flex-wrap gap-2">
+                            {% if results.ingredients_list %}
+                                {% for ing in results.ingredients_list %}
+                                    <button class="ingredient-tag px-2.5 py-1 bg-emerald-50 dark:bg-slate-700 text-emerald-950/80 dark:text-stone-50/80 rounded border border-emerald-950/10 dark:border-slate-600 text-xs font-mono shadow-sm hover:bg-emerald-100 dark:hover:bg-slate-600 transition-colors cursor-pointer" 
+                                          data-ingredient="{{ ing | lower }}" onclick="openIngredientModal('{{ ing }}')">{{ ing }}</button>
+                                {% endfor %}
+                            {% else %}
+                                <p class="text-emerald-950/40 dark:text-stone-50/40 text-sm italic font-mono">None detected</p>
+                            {% endif %}
+                        </div>
+                    </section>
+
+                    {% if results.key_ingredient_uses %}
+                    <section class="bg-white dark:bg-slate-800 rounded-2xl shadow-xl border border-emerald-950/10 dark:border-slate-700 p-6 animate-slide-up relative overflow-hidden transition-colors duration-300" style="animation-delay: 0.2s">
+                        <div class="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-emerald-400 to-emerald-600"></div>
+                        <div class="flex items-center gap-2 mb-4">
+                            <i data-lucide="info" class="text-emerald-600 dark:text-emerald-400 h-5 w-5"></i>
+                            <h3 class="font-bold text-emerald-950 dark:text-stone-50 font-serif text-lg">Key Uses</h3>
+                        </div>
+                        <div class="space-y-4">
+                            {% for item in results.key_ingredient_uses %}
+                                <div>
+                                    <p class="text-xs font-bold text-emerald-800 dark:text-emerald-400 mb-1 font-mono">{{ item.ingredient }}</p>
+                                    <p class="text-xs text-emerald-950/70 dark:text-stone-50/70 leading-relaxed">{{ item.uses }}</p>
+                                </div>
+                            {% endfor %}
+                        </div>
+                    </section>
+                    {% endif %}
+                </div>
+
+                <!-- Right Column: Issues & Directives -->
+                <div class="lg:col-span-8 space-y-6">
+                    <section class="bg-white dark:bg-slate-800 rounded-2xl shadow-xl border border-rose-100 dark:border-slate-700 p-6 animate-slide-up relative overflow-hidden transition-colors duration-300" style="animation-delay: 0.1s">
+                        <div class="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-rose-400 to-rose-600"></div>
+                        <div class="flex items-center justify-between mb-6">
+                            <div class="flex items-center gap-2">
+                                <i data-lucide="alert-circle" class="text-rose-600 dark:text-rose-400 h-5 w-5"></i>
+                                <h3 class="font-bold text-emerald-950 dark:text-stone-50 font-serif text-lg">Regulatory Issues</h3>
+                            </div>
+                            <button onclick="openAddIssueModal()" class="text-xs font-bold bg-white dark:bg-slate-700 border border-emerald-950/10 dark:border-slate-600 hover:bg-emerald-50 dark:hover:bg-slate-600 text-emerald-950 dark:text-stone-50 px-3 py-1.5 rounded-lg transition-colors flex items-center gap-1 shadow-sm active:scale-95">
+                                <i data-lucide="plus" class="h-3 w-3"></i> Add Issue
+                            </button>
+                        </div>
+                        <div class="space-y-4" id="issuesContainer">
+                            {% if results.issues %}
+                                {% for issue in results.issues %}
+                                    <div class="issue-card p-4 bg-rose-50/50 dark:bg-rose-900/10 rounded-xl border border-rose-100 dark:border-rose-900/50 flex flex-col gap-3 group transition-all hover:border-rose-300 dark:hover:border-rose-700 hover:shadow-sm" 
+                                         data-raw-desc="{{ issue.raw_desc }}" data-regulation="{{ issue.regulation_cited }}">
+                                        <div class="flex justify-between items-start gap-4">
+                                            <p class="issue-desc-html text-sm text-emerald-950/90 dark:text-stone-50/90 leading-relaxed flex-grow">{{ issue.description | safe }}</p>
+                                            <button onclick="openRegulationModal('{{ issue.regulation_cited }}')" class="shrink-0 text-[10px] font-bold uppercase tracking-tighter bg-rose-100 dark:bg-rose-900/50 text-rose-800 dark:text-rose-300 px-2 py-1 rounded hover:bg-rose-200 dark:hover:bg-rose-800 transition-colors font-mono border border-rose-200/50 dark:border-rose-800">
+                                                Ref: <span class="issue-reg-text">{{ issue.regulation_cited }}</span>
+                                            </button>
+                                        </div>
+                                        <div class="flex justify-end gap-3 opacity-0 group-hover:opacity-100 transition-opacity">
+                                            <button onclick="editIssue(this)" class="text-xs font-bold text-emerald-950/40 dark:text-stone-50/40 hover:text-emerald-600 dark:hover:text-emerald-400 flex items-center gap-1 transition-colors">
+                                                <i data-lucide="edit-2" class="h-3 w-3"></i> Edit
+                                            </button>
+                                            <button onclick="deleteIssue(this)" class="text-xs font-bold text-emerald-950/40 dark:text-stone-50/40 hover:text-rose-600 dark:hover:text-rose-400 flex items-center gap-1 transition-colors">
+                                                <i data-lucide="trash-2" class="h-3 w-3"></i> Delete
+                                            </button>
+                                        </div>
+                                    </div>
+                                {% endfor %}
+                            {% else %}
+                                <div id="noIssuesEmptyState" class="text-center py-8 bg-emerald-50/50 dark:bg-slate-700/50 rounded-xl border border-emerald-950/10 dark:border-slate-600 border-dashed">
+                                    <p class="text-sm text-emerald-950/50 dark:text-stone-50/50 font-mono">No regulatory issues detected.</p>
+                                </div>
+                            {% endif %}
+                        </div>
+                    </section>
+
+                    <section class="bg-emerald-950 dark:bg-slate-800 rounded-2xl shadow-xl p-8 text-stone-50 animate-slide-up relative overflow-hidden transition-colors duration-300" style="animation-delay: 0.3s">
+                        <div class="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-emerald-600 to-emerald-800"></div>
+                        <div class="absolute top-0 right-0 w-64 h-64 bg-emerald-800/20 dark:bg-emerald-500/10 rounded-full blur-3xl -z-10"></div>
+                        <div class="flex items-center justify-between mb-8">
+                            <div class="flex items-center gap-3">
+                                <i data-lucide="file-text" class="text-emerald-400 h-6 w-6"></i>
+                                <h3 class="text-2xl font-serif font-bold text-stone-50">Compliance Directive</h3>
+                            </div>
+                            <button onclick="copyDirective()" class="flex items-center gap-2 text-xs font-bold bg-emerald-900 dark:bg-slate-700 hover:bg-emerald-800 dark:hover:bg-slate-600 border border-emerald-800/50 dark:border-slate-600 px-3 py-2 rounded-lg transition-all active:scale-95 text-stone-50" id="copyBtn">
+                                <i data-lucide="copy" class="h-4 w-4"></i>
+                                <span class="font-mono uppercase tracking-wider">Copy Text</span>
+                            </button>
+                        </div>
+                        <div class="space-y-5 text-stone-50/90 leading-relaxed font-serif text-lg" id="directiveContent">
+                            {% for item in results.compliance_directive_formatted %}
+                                {% if item.startswith(' - ') %}
+                                    <div class="flex gap-4 items-start ml-2">
+                                        <span class="mt-2.5 w-1.5 h-1.5 rounded-full bg-emerald-400 shrink-0"></span>
+                                        <p class="text-base">{{ item.lstrip(' - ') | safe }}</p>
+                                    </div>
+                                {% else %}
+                                    <p class="text-base font-medium border-l-2 border-emerald-500/30 pl-5">{{ item | safe }}</p>
+                                {% endif %}
+                            {% endfor %}
+                        </div>
+                    </section>
+
+                    {% if results.suggested_corrections %}
+                    <section class="bg-white dark:bg-slate-800 rounded-2xl shadow-xl border border-emerald-950/10 dark:border-slate-700 p-6 animate-slide-up relative overflow-hidden transition-colors duration-300" style="animation-delay: 0.4s">
+                        <div class="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-amber-400 to-amber-600"></div>
+                        <div class="flex items-center gap-2 mb-4">
+                            <i data-lucide="lightbulb" class="text-amber-500 h-5 w-5"></i>
+                            <h3 class="font-bold text-emerald-950 dark:text-stone-50 font-serif text-lg">Suggested Improvements</h3>
+                        </div>
+                        <ul class="space-y-3">
+                            {% for correction in results.suggested_corrections %}
+                                <li class="flex gap-3 items-start text-sm text-emerald-950/70 dark:text-stone-50/70">
+                                    <i data-lucide="check" class="h-4 w-4 text-emerald-500 mt-0.5 shrink-0"></i>
+                                    <span>{{ correction }}</span>
+                                </li>
+                            {% endfor %}
+                        </ul>
+                    </section>
+                    {% endif %}
+                </div>
+            </div>
+        {% endif %}
+    </main>
+
+    <!-- Regulation Modal -->
+    <div id="regulationModal" class="modal fixed inset-0 z-50 hidden items-center justify-center p-4">
+        <div class="absolute inset-0 bg-emerald-950/60 dark:bg-slate-900/80 backdrop-blur-sm" onclick="closeModal()"></div>
+        <div class="modal-content bg-white dark:bg-slate-800 w-full max-w-2xl rounded-2xl shadow-2xl relative z-10 overflow-hidden animate-slide-up border border-emerald-950/10 dark:border-slate-700 transition-colors duration-300">
+            <div class="bg-emerald-950 dark:bg-slate-900 p-6 text-stone-50 flex justify-between items-center">
+                <div>
+                    <p class="text-[10px] font-bold uppercase tracking-widest opacity-70 font-mono">NAFDAC Regulation</p>
+                    <h3 id="modalTopic" class="text-xl font-serif font-bold">Loading...</h3>
+                </div>
+                <button onclick="closeModal()" class="close-button p-2 hover:bg-emerald-800 dark:hover:bg-slate-800 rounded-full transition-colors active:scale-90">
+                    <i data-lucide="x" class="h-6 w-6"></i>
+                </button>
+            </div>
+            <div class="p-8">
+                <div class="flex items-center gap-2 mb-6">
+                    <span class="bg-emerald-50 dark:bg-slate-700 border border-emerald-950/10 dark:border-slate-600 text-emerald-950 dark:text-stone-50 px-3 py-1 rounded-full text-xs font-bold font-mono shadow-sm">Section <span id="modalSection"></span></span>
+                </div>
+                <div class="bg-stone-50 dark:bg-slate-900/50 rounded-xl p-6 border border-emerald-950/10 dark:border-slate-700 shadow-inner">
+                    <p class="text-[10px] font-bold text-emerald-950/40 dark:text-stone-50/40 uppercase mb-3 font-mono tracking-widest">Full Regulatory Text</p>
+                    <div id="modalText" class="text-emerald-950/80 dark:text-stone-50/80 text-sm leading-relaxed max-h-60 overflow-y-auto custom-scrollbar font-serif"></div>
+                </div>
+            </div>
+            <div class="bg-emerald-50/50 dark:bg-slate-900/50 p-4 text-center border-t border-emerald-950/5 dark:border-slate-700">
+                <p class="text-[10px] text-emerald-950/40 dark:text-stone-50/40 uppercase font-bold tracking-widest font-mono">Official NAFDAC Reference Database</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Issue Modal (Add/Edit) -->
+    <div id="issueModal" class="modal fixed inset-0 z-50 hidden items-center justify-center p-4">
+        <div class="absolute inset-0 bg-emerald-950/60 dark:bg-slate-900/80 backdrop-blur-sm" onclick="closeIssueModal()"></div>
+        <div class="modal-content bg-white dark:bg-slate-800 w-full max-w-lg rounded-2xl shadow-2xl relative z-10 overflow-hidden animate-slide-up border border-emerald-950/10 dark:border-slate-700 transition-colors duration-300">
+            <div class="bg-emerald-950 dark:bg-slate-900 p-5 text-stone-50 flex justify-between items-center">
+                <h3 id="issueModalTitle" class="text-lg font-serif font-bold">Add Manual Issue</h3>
+                <button onclick="closeIssueModal()" class="close-button p-1.5 hover:bg-emerald-800 dark:hover:bg-slate-800 rounded-full transition-colors active:scale-90">
+                    <i data-lucide="x" class="h-5 w-5"></i>
+                </button>
+            </div>
+            <div class="p-6 space-y-5">
+                <input type="hidden" id="issueEditIndex" value="-1">
+                <div>
+                    <label class="block text-[10px] font-bold text-emerald-950/60 dark:text-stone-50/60 uppercase mb-2 font-mono tracking-widest">Issue Description</label>
+                    <textarea id="issueDescInput" rows="4" class="w-full bg-white dark:bg-slate-900 border border-emerald-950/20 dark:border-slate-600 rounded-xl p-4 text-sm focus:ring-2 focus:ring-emerald-600 dark:focus:ring-emerald-500 focus:border-emerald-600 dark:focus:border-emerald-500 outline-none transition-all shadow-sm font-serif text-emerald-950 dark:text-stone-50" placeholder="Describe the regulatory violation..."></textarea>
+                </div>
+                <div>
+                    <label class="block text-[10px] font-bold text-emerald-950/60 dark:text-stone-50/60 uppercase mb-2 font-mono tracking-widest">Regulation Cited</label>
+                    <input type="text" id="issueRegInput" class="w-full bg-white dark:bg-slate-900 border border-emerald-950/20 dark:border-slate-600 rounded-xl p-4 text-sm focus:ring-2 focus:ring-emerald-600 dark:focus:ring-emerald-500 focus:border-emerald-600 dark:focus:border-emerald-500 outline-none transition-all shadow-sm font-mono text-emerald-950 dark:text-stone-50" placeholder="e.g., Regulation 3(4)">
+                </div>
+            </div>
+            <div class="bg-emerald-50/50 dark:bg-slate-900/50 p-4 flex justify-end gap-3 border-t border-emerald-950/5 dark:border-slate-700">
+                <button onclick="closeIssueModal()" class="px-5 py-2.5 text-sm font-bold text-emerald-950/60 dark:text-stone-50/60 hover:bg-emerald-950/10 dark:hover:bg-slate-700 rounded-lg transition-colors active:scale-95 font-mono uppercase tracking-wider">Cancel</button>
+                <button onclick="saveIssue()" class="px-5 py-2.5 text-sm font-bold bg-emerald-950 dark:bg-emerald-700 hover:bg-emerald-800 dark:hover:bg-emerald-600 text-stone-50 rounded-lg transition-colors active:scale-95 shadow-md font-mono uppercase tracking-wider">Save Issue</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Ingredient Info Modal -->
+    <div id="ingredientModal" class="modal fixed inset-0 z-50 hidden items-center justify-center p-4">
+        <div class="absolute inset-0 bg-emerald-950/60 dark:bg-slate-900/80 backdrop-blur-sm" onclick="closeIngredientModal()"></div>
+        <div class="modal-content bg-white dark:bg-slate-800 w-full max-w-md rounded-2xl shadow-2xl relative z-10 overflow-hidden animate-slide-up border border-emerald-950/10 dark:border-slate-700 transition-colors duration-300">
+            <div class="bg-emerald-950 dark:bg-slate-900 p-5 text-stone-50 flex justify-between items-center">
+                <h3 id="ingredientModalTitle" class="text-lg font-serif font-bold capitalize">Ingredient Info</h3>
+                <button onclick="closeIngredientModal()" class="close-button p-1.5 hover:bg-emerald-800 dark:hover:bg-slate-800 rounded-full transition-colors active:scale-90">
+                    <i data-lucide="x" class="h-5 w-5"></i>
+                </button>
+            </div>
+            <div class="p-6">
+                <div id="ingredientModalLoading" class="flex flex-col items-center justify-center py-6 hidden">
+                    <div class="w-8 h-8 border-4 border-emerald-200 dark:border-slate-600 border-t-emerald-600 dark:border-t-emerald-400 rounded-full animate-spin mb-3"></div>
+                    <p class="text-xs text-emerald-950/50 dark:text-stone-50/50 font-mono animate-pulse">Analyzing ingredient...</p>
+                </div>
+                <div id="ingredientModalContent" class="text-emerald-950/80 dark:text-stone-50/80 text-sm leading-relaxed font-serif">
+                    <!-- Content injected here -->
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <footer class="bg-white/50 dark:bg-slate-900/50 backdrop-blur-sm border-t border-emerald-950/5 dark:border-slate-700/50 py-8 mt-auto transition-colors duration-300">
+        <div class="container mx-auto px-4 text-center">
+            <p class="text-emerald-950/40 dark:text-stone-50/40 text-xs font-mono">Developed by <span class="text-emerald-950/70 dark:text-stone-50/70 font-bold">Babagana, Shamsuddeen</span></p>
+            <p class="text-emerald-950/30 dark:text-stone-50/30 text-[9px] mt-2 uppercase tracking-widest font-mono font-bold">Official Compliance Tool v2.0</p>
+        </div>
+    </footer>
+
+    <script>
+        lucide.createIcons();
+
+        // 1. Interactive Ingredient Highlighting
+        const ingredientTags = document.querySelectorAll('.ingredient-tag');
+        const issueCards = document.querySelectorAll('.issue-card');
+
+        issueCards.forEach(card => {
+            card.addEventListener('mouseenter', () => {
+                const desc = card.dataset.rawDesc || '';
+                ingredientTags.forEach(tag => {
+                    if (desc.includes(tag.dataset.ingredient)) {
+                        tag.classList.add('highlighted');
+                    }
+                });
+            });
+
+            card.addEventListener('mouseleave', () => {
+                ingredientTags.forEach(tag => tag.classList.remove('highlighted'));
+            });
+        });
+
+        ingredientTags.forEach(tag => {
+            tag.addEventListener('mouseenter', () => {
+                const ing = tag.dataset.ingredient;
+                issueCards.forEach(card => {
+                    if ((card.dataset.rawDesc || '').includes(ing)) {
+                        card.classList.add('active');
+                    }
+                });
+            });
+
+            tag.addEventListener('mouseleave', () => {
+                issueCards.forEach(card => card.classList.remove('active'));
+            });
+        });
+
+        // 2. Copy to Clipboard
+        function copyDirective() {
+            const content = document.getElementById('directiveContent').innerText;
+            const btn = document.getElementById('copyBtn');
+            const originalHtml = btn.innerHTML;
+
+            navigator.clipboard.writeText(content).then(() => {
+                btn.innerHTML = '<i data-lucide="check" class="h-4 w-4"></i><span>Copied!</span>';
+                btn.classList.replace('bg-emerald-800', 'bg-emerald-600');
+                lucide.createIcons();
+                
+                setTimeout(() => {
+                    btn.innerHTML = originalHtml;
+                    btn.classList.replace('bg-emerald-600', 'bg-emerald-800');
+                    lucide.createIcons();
+                }, 2000);
+            });
+        }
+
+        // 3. Regulation Modal Logic
+        const modal = document.getElementById('regulationModal');
+        const modalTopic = document.getElementById('modalTopic');
+        const modalSection = document.getElementById('modalSection');
+        const modalText = document.getElementById('modalText');
+
+        function openRegulationModal(sectionNumber) {
+            modalTopic.textContent = 'Fetching...';
+            modalSection.textContent = sectionNumber;
+            modalText.textContent = 'Loading regulation details from database...';
+            modal.classList.remove('hidden');
+            modal.classList.add('flex');
+
+            fetch(`/get_regulation/${encodeURIComponent(sectionNumber)}`)
+                .then(res => res.json())
+                .then(data => {
+                    if (data.success) {
+                        modalTopic.textContent = data.topic;
+                        modalText.textContent = data.rule_text;
+                    } else {
+                        modalTopic.textContent = 'Not Found';
+                        modalText.textContent = 'The specific text for this regulation section could not be retrieved.';
+                    }
+                })
+                .catch(() => {
+                    modalTopic.textContent = 'Error';
+                    modalText.textContent = 'Failed to connect to the regulatory database.';
+                });
+        }
+
+        function closeModal() {
+            modal.classList.add('hidden');
+            modal.classList.remove('flex');
+        }
+
+        // Ingredient Modal Logic
+        const ingredientModal = document.getElementById('ingredientModal');
+        const ingredientModalTitle = document.getElementById('ingredientModalTitle');
+        const ingredientModalContent = document.getElementById('ingredientModalContent');
+        const ingredientModalLoading = document.getElementById('ingredientModalLoading');
+        
+        // Cache object to store fetched ingredient info locally
+        const ingredientCache = {};
+
+        function openIngredientModal(ingredientName) {
+            ingredientModalTitle.textContent = ingredientName;
+            ingredientModalContent.innerHTML = '';
+            ingredientModalContent.classList.add('hidden');
+            ingredientModalLoading.classList.remove('hidden');
+            
+            ingredientModal.classList.remove('hidden');
+            ingredientModal.classList.add('flex');
+
+            const ingredientLower = ingredientName.toLowerCase();
+
+            // Check if we already have it in key_ingredient_uses
+            const currentResults = {{ results | tojson | safe }};
+            const keyUses = currentResults.key_ingredient_uses || [];
+            const existingUse = keyUses.find(item => item.ingredient.toLowerCase() === ingredientLower);
+
+            if (existingUse) {
+                setTimeout(() => {
+                    ingredientModalLoading.classList.add('hidden');
+                    ingredientModalContent.classList.remove('hidden');
+                    ingredientModalContent.textContent = existingUse.uses;
+                }, 300); // Small delay for UX
+                return;
+            }
+            
+            // Check local cache
+            if (ingredientCache[ingredientLower]) {
+                setTimeout(() => {
+                    ingredientModalLoading.classList.add('hidden');
+                    ingredientModalContent.classList.remove('hidden');
+                    ingredientModalContent.textContent = ingredientCache[ingredientLower];
+                }, 300);
+                return;
+            }
+
+            // Fetch from API
+            fetch('/api/ingredient-info', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ ingredient: ingredientName })
+            })
+            .then(res => res.json().then(data => ({ status: res.status, body: data })))
+            .then(({ status, body }) => {
+                ingredientModalLoading.classList.add('hidden');
+                ingredientModalContent.classList.remove('hidden');
+                
+                if (status === 429 || body.error?.includes("Rate limit")) {
+                    ingredientModalContent.innerHTML = `<span class="text-amber-600 dark:text-amber-400 font-bold">Rate Limit Exceeded:</span> Please wait about 15-20 seconds before checking another ingredient.`;
+                } else if (body.description) {
+                    ingredientModalContent.textContent = body.description;
+                    ingredientCache[ingredientLower] = body.description; // Save to local cache
+                } else if (body.error) {
+                    ingredientModalContent.textContent = body.error;
+                } else {
+                    ingredientModalContent.textContent = 'Could not retrieve information for this ingredient.';
+                }
+            })
+            .catch(() => {
+                ingredientModalLoading.classList.add('hidden');
+                ingredientModalContent.classList.remove('hidden');
+                ingredientModalContent.textContent = 'Failed to connect to the analysis server.';
+            });
+        }
+
+        function closeIngredientModal() {
+            ingredientModal.classList.add('hidden');
+            ingredientModal.classList.remove('flex');
+        }
+
+        document.addEventListener('click', function(e) {
+            if (e.target.classList.contains('regulation-link')) {
+                openRegulationModal(e.target.dataset.section);
+            }
+        });
+
+        // 4. Save to Local History (Zero Server Storage)
+        try {
+            const currentResults = {{ results | tojson | safe }};
+            if (currentResults && !currentResults.error) {
+                let history = JSON.parse(localStorage.getItem('nafdac_history') || '[]');
+                currentResults.timestamp = new Date().toISOString();
+                
+                // Remove older entry of same product to avoid duplicates
+                history = history.filter(item => item.product_name !== currentResults.product_name);
+                history.unshift(currentResults); // Add to top
+                
+                if (history.length > 10) history.pop(); // Keep only last 10
+                localStorage.setItem('nafdac_history', JSON.stringify(history));
+            }
+        } catch (e) {
+            console.error("Could not save history", e);
+        }
+        // 5. Correction Mode Logic
+        const issueModal = document.getElementById('issueModal');
+        const issueDescInput = document.getElementById('issueDescInput');
+        const issueRegInput = document.getElementById('issueRegInput');
+        const issueEditIndex = document.getElementById('issueEditIndex');
+        const issuesContainer = document.getElementById('issuesContainer');
+        const noIssuesEmptyState = document.getElementById('noIssuesEmptyState');
+        let currentEditCard = null;
+
+        function openAddIssueModal() {
+            document.getElementById('issueModalTitle').textContent = 'Add Manual Issue';
+            issueDescInput.value = '';
+            issueRegInput.value = '';
+            currentEditCard = null;
+            
+            issueModal.classList.remove('hidden');
+            issueModal.classList.add('flex');
+        }
+
+        function editIssue(btn) {
+            document.getElementById('issueModalTitle').textContent = 'Edit Issue';
+            currentEditCard = btn.closest('.issue-card');
+            
+            issueDescInput.value = currentEditCard.dataset.rawDesc;
+            issueRegInput.value = currentEditCard.dataset.regulation;
+            
+            issueModal.classList.remove('hidden');
+            issueModal.classList.add('flex');
+        }
+
+        function closeIssueModal() {
+            issueModal.classList.add('hidden');
+            issueModal.classList.remove('flex');
+        }
+
+        function deleteIssue(btn) {
+            if (confirm('Are you sure you want to remove this issue?')) {
+                const card = btn.closest('.issue-card');
+                card.remove();
+                checkEmptyState();
+            }
+        }
+
+        function saveIssue() {
+            const desc = issueDescInput.value.trim();
+            const reg = issueRegInput.value.trim();
+            
+            if (!desc || !reg) {
+                alert('Both description and regulation are required.');
+                return;
+            }
+
+            // Simple pseudo-formatting for the display text (making regulation bold)
+            const displayHtml = desc + ` (<strong>${reg}</strong>)`;
+
+            if (currentEditCard) {
+                // Update existing
+                currentEditCard.dataset.rawDesc = desc;
+                currentEditCard.dataset.regulation = reg;
+                currentEditCard.querySelector('.issue-desc-html').innerHTML = displayHtml;
+                currentEditCard.querySelector('.issue-reg-text').textContent = reg;
+                currentEditCard.querySelector('button[onclick^="openRegulationModal"]').setAttribute('onclick', `openRegulationModal('${reg}')`);
+            } else {
+                // Create new
+                const newCard = document.createElement('div');
+                newCard.className = 'issue-card p-4 bg-rose-50/50 dark:bg-rose-900/10 rounded-xl border border-rose-100 dark:border-rose-900/50 flex flex-col gap-3 group transition-all hover:border-rose-300 dark:hover:border-rose-700 hover:shadow-sm';
+                newCard.dataset.rawDesc = desc;
+                newCard.dataset.regulation = reg;
+                
+                newCard.innerHTML = `
+                    <div class="flex justify-between items-start gap-4">
+                        <p class="issue-desc-html text-sm text-emerald-950/90 dark:text-stone-50/90 leading-relaxed flex-grow">${displayHtml}</p>
+                        <button onclick="openRegulationModal('${reg}')" class="shrink-0 text-[10px] font-bold uppercase tracking-tighter bg-rose-100 dark:bg-rose-900/50 text-rose-800 dark:text-rose-300 px-2 py-1 rounded hover:bg-rose-200 dark:hover:bg-rose-800 transition-colors font-mono border border-rose-200/50 dark:border-rose-800">
+                            Ref: <span class="issue-reg-text">${reg}</span>
+                        </button>
+                    </div>
+                    <div class="flex justify-end gap-3 opacity-0 group-hover:opacity-100 transition-opacity">
+                        <button onclick="editIssue(this)" class="text-xs font-bold text-emerald-950/40 dark:text-stone-50/40 hover:text-emerald-600 dark:hover:text-emerald-400 flex items-center gap-1 transition-colors">
+                            <i data-lucide="edit-2" class="h-3 w-3"></i> Edit
+                        </button>
+                        <button onclick="deleteIssue(this)" class="text-xs font-bold text-emerald-950/40 dark:text-stone-50/40 hover:text-rose-600 dark:hover:text-rose-400 flex items-center gap-1 transition-colors">
+                            <i data-lucide="trash-2" class="h-3 w-3"></i> Delete
+                        </button>
+                    </div>
+                `;
+                
+                if (noIssuesEmptyState) {
+                    noIssuesEmptyState.remove();
+                }
+                issuesContainer.appendChild(newCard);
+                lucide.createIcons();
+            }
+            
+            closeIssueModal();
+        }
+
+        function checkEmptyState() {
+            const cards = issuesContainer.querySelectorAll('.issue-card');
+            if (cards.length === 0) {
+                issuesContainer.innerHTML = `
+                    <div id="noIssuesEmptyState" class="text-center py-8 bg-emerald-50/50 dark:bg-slate-700/50 rounded-xl border border-emerald-950/10 dark:border-slate-600 border-dashed">
+                        <p class="text-sm text-emerald-950/50 dark:text-stone-50/50 font-mono">No regulatory issues detected.</p>
+                    </div>
+                `;
+            }
+        }
+
+        function exportReport() {
+            const issues = [];
+            document.querySelectorAll('.issue-card').forEach(card => {
+                issues.push({
+                    description: card.querySelector('.issue-desc-html').innerHTML,
+                    raw_desc: card.dataset.rawDesc,
+                    regulation_cited: card.dataset.regulation
+                });
+            });
+            
+            // Update local history before exporting
+            try {
+                let history = JSON.parse(localStorage.getItem('nafdac_history') || '[]');
+                const currentProductName = "{{ results.product_name }}";
+                const historyIndex = history.findIndex(item => item.product_name === currentProductName);
+                
+                if (historyIndex !== -1) {
+                    history[historyIndex].issues = issues;
+                    if (issues.length === 0) {
+                        history[historyIndex].compliance_status = 'Compliant';
+                    } else {
+                        history[historyIndex].compliance_status = 'Non-Compliant';
+                    }
+                    localStorage.setItem('nafdac_history', JSON.stringify(history));
+                }
+            } catch (e) {
+                console.error("Could not update history", e);
+            }
+            
+            document.getElementById('modifiedIssuesInput').value = JSON.stringify(issues);
+            document.getElementById('exportForm').submit();
+        }
+    </script>
+</body>
+</html>

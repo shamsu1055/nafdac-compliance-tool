@@ -1,0 +1,106 @@
+/* Custom Animations for NAFDAC Checker */
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes slideUp {
+  from { transform: translateY(100%); }
+  to { transform: translateY(0); }
+}
+
+.animate-fade-in {
+  animation: fadeIn 0.5s ease-out forwards;
+}
+
+/* Modal Backdrop Blur */
+.modal-backdrop {
+  background-color: rgba(2, 44, 34, 0.6);
+  backdrop-filter: blur(4px);
+}
+
+/* Custom Scrollbar for Modal */
+.custom-scrollbar::-webkit-scrollbar {
+  width: 6px;
+}
+.custom-scrollbar::-webkit-scrollbar-track {
+  background: #fdfbf7;
+}
+.dark .custom-scrollbar::-webkit-scrollbar-track {
+  background: #0f172a;
+}
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background: #022c22;
+  border-radius: 10px;
+}
+.dark .custom-scrollbar::-webkit-scrollbar-thumb {
+  background: #334155;
+}
+
+/* Gradient for the upload area */
+.upload-gradient { 
+  background: linear-gradient(135deg, rgba(253, 251, 247, 0.5) 0%, rgba(255, 255, 255, 0.8) 100%); 
+}
+.dark .upload-gradient {
+  background: linear-gradient(135deg, rgba(15, 23, 42, 0.5) 0%, rgba(30, 41, 59, 0.8) 100%);
+}
+
+/* Mobile Bottom Sheet Styles */
+@media (max-width: 768px) {
+  .modal-content {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    width: 100% !important;
+    max-width: 100% !important;
+    border-radius: 20px 20px 0 0 !important;
+    margin: 0 !important;
+    animation: slideUp 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards !important;
+    max-height: 85vh;
+    overflow-y: auto;
+  }
+  
+  .modal {
+    align-items: flex-end !important;
+  }
+
+  .close-button {
+    top: 15px !important;
+    right: 20px !important;
+  }
+}
+
+/* Interactive Highlighting */
+.ingredient-tag {
+  transition: all 0.2s ease;
+  cursor: pointer;
+}
+
+.ingredient-tag.highlighted {
+  background-color: #fef08a !important; /* Yellow-200 */
+  border-color: #facc15 !important; /* Yellow-400 */
+  color: #854d0e !important; /* Yellow-900 */
+  transform: scale(1.05);
+  box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1);
+}
+
+.dark .ingredient-tag.highlighted {
+  background-color: rgba(250, 204, 21, 0.2) !important;
+  border-color: #facc15 !important;
+  color: #fef08a !important;
+}
+
+.issue-card {
+  transition: border-color 0.2s ease;
+}
+
+.issue-card.active {
+  border-color: #facc15 !important;
+  background-color: #fffbeb !important;
+}
+
+.dark .issue-card.active {
+  border-color: #facc15 !important;
+  background-color: rgba(250, 204, 21, 0.1) !important;
+}

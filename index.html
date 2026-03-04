@@ -1,0 +1,364 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="theme-color" content="#059669">
+    <link rel="manifest" href="{{ url_for('static', filename='manifest.json') }}">
+    <link rel="apple-touch-icon" href="{{ url_for('static', filename='nafdac-logo.png') }}">
+    <title>NAFDAC Label Compliance Checker</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Playfair+Display:ital,wght@0,600;0,700;1,600&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                        serif: ['Playfair Display', 'serif'],
+                        mono: ['JetBrains Mono', 'monospace'],
+                    },
+                    colors: {
+                        stone: { 50: '#fdfbf7' },
+                        emerald: { 950: '#022c22' }
+                    }
+                }
+            }
+        }
+    </script>
+    <script>
+        // Initialize theme early to prevent flash
+        if (localStorage.theme === 'dark' || (!('theme' in localStorage) && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+            document.documentElement.classList.add('dark')
+        } else {
+            document.documentElement.classList.remove('dark')
+        }
+        function toggleTheme() {
+            document.documentElement.classList.toggle('dark');
+            if (document.documentElement.classList.contains('dark')) {
+                localStorage.theme = 'dark';
+            } else {
+                localStorage.theme = 'light';
+            }
+        }
+    </script>
+</head>
+<body class="bg-stone-50 dark:bg-slate-900 text-emerald-950 dark:text-stone-50 min-h-screen flex flex-col relative overflow-x-hidden transition-colors duration-300">
+    <!-- Background Decoration -->
+    <div class="absolute top-0 left-0 w-full h-96 bg-gradient-to-b from-emerald-900/5 dark:from-emerald-900/20 to-transparent -z-10"></div>
+    <div class="absolute top-[-10%] right-[-5%] w-96 h-96 bg-emerald-500/10 dark:bg-emerald-500/5 rounded-full blur-3xl -z-10"></div>
+
+    <header class="bg-white/70 dark:bg-slate-900/70 backdrop-blur-md border-b border-emerald-950/10 dark:border-slate-700/50 py-6 sticky top-0 z-10 shadow-sm transition-colors duration-300">
+        <div class="container mx-auto px-4 relative flex flex-col items-center">
+            <button onclick="toggleTheme()" class="absolute right-4 top-0 p-2 text-emerald-950/60 dark:text-stone-50/60 hover:text-emerald-700 dark:hover:text-emerald-400 transition-colors rounded-full hover:bg-emerald-50 dark:hover:bg-slate-800" aria-label="Toggle Dark Mode">
+                <i data-lucide="moon" class="h-5 w-5 hidden dark:block"></i>
+                <i data-lucide="sun" class="h-5 w-5 block dark:hidden"></i>
+            </button>
+            <img src="{{ url_for('static', filename='nafdac-logo.png') }}" alt="NAFDAC Logo" class="h-16 mb-4 hover:scale-105 transition-transform duration-300">
+            <h1 class="text-2xl md:text-3xl font-serif font-bold text-emerald-950 dark:text-stone-50 text-center tracking-tight">Label Compliance Checker</h1>
+            <p class="text-emerald-700 dark:text-emerald-400 font-mono tracking-widest uppercase text-[10px] mt-2 font-bold">Cosmetics & Household Products</p>
+        </div>
+    </header>
+
+    <main class="container mx-auto px-4 py-12 max-w-3xl flex-grow">
+        <section class="text-center mb-12 animate-fade-in">
+            <p class="text-emerald-950/70 dark:text-stone-50/70 text-lg leading-relaxed max-w-2xl mx-auto">
+                Upload your product label to verify compliance with <span class="font-bold text-emerald-800 dark:text-emerald-400">NAFDAC regulations</span>. 
+                Our AI-powered system provides instant regulatory feedback.
+            </p>
+        </section>
+
+        {% with messages = get_flashed_messages() %}
+            {% if messages %}
+                <div class="mb-8 space-y-2">
+                    {% for message in messages %}
+                        <div class="bg-amber-50 border-l-4 border-amber-400 p-4 rounded-r-lg flex items-center shadow-sm animate-fade-in">
+                            <i data-lucide="alert-circle" class="text-amber-500 mr-3 h-5 w-5"></i>
+                            <p class="text-amber-800 font-medium">{{ message }}</p>
+                        </div>
+                    {% endfor %}
+                </div>
+            {% endif %}
+        {% endwith %}
+
+        <section class="bg-white dark:bg-slate-800 rounded-2xl shadow-xl border border-emerald-950/5 dark:border-slate-700 p-8 mb-10 animate-fade-in relative overflow-hidden transition-colors duration-300" style="animation-delay: 0.1s">
+            <div class="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-emerald-400 to-emerald-700"></div>
+            <form method="post" action="{{ url_for('upload_file') }}" enctype="multipart/form-data" id="uploadForm">
+                <div class="relative group">
+                    <input type="file" name="file" id="file" accept=".png,.jpg,.jpeg,.pdf" required 
+                           class="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-20">
+                    <div id="dropZone" class="upload-gradient border-2 border-dashed border-emerald-950/20 dark:border-slate-600 rounded-xl p-12 text-center transition-all duration-300 group-hover:border-emerald-500 dark:group-hover:border-emerald-400 group-hover:bg-emerald-50/50 dark:group-hover:bg-slate-700/50">
+                        <!-- Preview Container (Hidden by default) -->
+                        <div id="previewContainer" class="hidden mb-4 relative inline-block animate-fade-in">
+                            <img id="imagePreview" src="#" alt="Label Preview" class="max-h-48 rounded-lg shadow-md border border-emerald-100 dark:border-slate-600">
+                            <div id="pdfPreview" class="hidden bg-emerald-100 dark:bg-emerald-900/30 w-32 h-40 rounded-lg flex flex-col items-center justify-center border border-emerald-200 dark:border-emerald-800">
+                                <i data-lucide="file-text" class="h-12 w-12 text-emerald-600 dark:text-emerald-400 mb-2"></i>
+                                <span class="text-[10px] font-bold text-emerald-800 dark:text-emerald-400 uppercase font-mono">PDF Document</span>
+                            </div>
+                            <button type="button" id="removeFile" class="absolute -top-2 -right-2 bg-rose-500 text-white rounded-full p-1 shadow-lg hover:bg-rose-600 active:scale-90 transition-all z-30">
+                                <i data-lucide="x" class="h-4 w-4"></i>
+                            </button>
+                        </div>
+
+                        <!-- Default Upload Icon -->
+                        <div id="uploadIconContainer" class="bg-emerald-50 dark:bg-slate-700 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4 group-hover:scale-110 group-hover:bg-emerald-100 dark:group-hover:bg-slate-600 transition-all duration-300 border border-emerald-950/5 dark:border-slate-600">
+                            <i data-lucide="upload-cloud" class="text-emerald-700 dark:text-emerald-400 h-8 w-8"></i>
+                        </div>
+                        <h3 class="text-lg font-serif font-bold text-emerald-950 dark:text-stone-50 mb-1" id="fileNameDisplay">Select Label File</h3>
+                        <p class="text-emerald-950/50 dark:text-stone-50/50 text-sm font-mono" id="uploadHint">Drag and drop or click to browse</p>
+                        <p class="text-rose-500 dark:text-rose-400 text-xs font-bold mt-2 hidden font-mono" id="errorMessage"></p>
+                    </div>
+                </div>
+                <button type="submit" id="submitBtn" class="w-full mt-8 bg-emerald-950 dark:bg-emerald-700 hover:bg-emerald-800 dark:hover:bg-emerald-600 active:scale-[0.98] text-white font-bold py-4 px-6 rounded-xl shadow-lg shadow-emerald-900/20 dark:shadow-none transition-all duration-300 flex items-center justify-center gap-2 group disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-emerald-950 dark:disabled:hover:bg-emerald-700 disabled:active:scale-100">
+                    <span class="font-serif tracking-wide">Analyze Label</span>
+                    <i data-lucide="arrow-right" class="h-5 w-5 group-hover:translate-x-1 transition-transform"></i>
+                </button>
+            </form>
+        </section>
+
+        <section class="text-center space-y-4 animate-fade-in" style="animation-delay: 0.2s">
+            <div class="flex items-center justify-center gap-2 text-emerald-950/40 dark:text-stone-50/40 mb-2">
+                <i data-lucide="file-check" class="h-4 w-4"></i>
+                <p class="text-[10px] font-bold uppercase tracking-widest font-mono">Supported Formats</p>
+            </div>
+            <div class="flex flex-wrap justify-center gap-3">
+                <span class="px-3 py-1 bg-white dark:bg-slate-800 border border-emerald-950/10 dark:border-slate-700 text-emerald-950/70 dark:text-stone-50/70 rounded-full text-[10px] font-bold uppercase tracking-wider font-mono shadow-sm transition-colors duration-300">PNG</span>
+                <span class="px-3 py-1 bg-white dark:bg-slate-800 border border-emerald-950/10 dark:border-slate-700 text-emerald-950/70 dark:text-stone-50/70 rounded-full text-[10px] font-bold uppercase tracking-wider font-mono shadow-sm transition-colors duration-300">JPG</span>
+                <span class="px-3 py-1 bg-white dark:bg-slate-800 border border-emerald-950/10 dark:border-slate-700 text-emerald-950/70 dark:text-stone-50/70 rounded-full text-[10px] font-bold uppercase tracking-wider font-mono shadow-sm transition-colors duration-300">JPEG</span>
+                <span class="px-3 py-1 bg-white dark:bg-slate-800 border border-emerald-950/10 dark:border-slate-700 text-emerald-950/70 dark:text-stone-50/70 rounded-full text-[10px] font-bold uppercase tracking-wider font-mono shadow-sm transition-colors duration-300">PDF</span>
+            </div>
+            <p class="text-emerald-950/40 dark:text-stone-50/40 text-[10px] italic font-mono mt-4">Maximum file size: 10MB • PDF: First page only</p>
+        </section>
+    </main>
+
+    <!-- History Section (Client-Side) -->
+    <div id="historySection" class="container mx-auto px-4 max-w-4xl mb-12 hidden animate-fade-in" style="animation-delay: 0.3s">
+        <h3 class="text-sm font-bold text-emerald-950/70 dark:text-stone-50/70 mb-4 flex items-center gap-2 justify-center md:justify-start uppercase tracking-widest font-mono">
+            <i data-lucide="clock" class="h-4 w-4 text-emerald-600 dark:text-emerald-400"></i>
+            Recent Analyses
+        </h3>
+        <div id="historyList" class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <!-- Populated by JS -->
+        </div>
+    </div>
+
+    <form id="historyForm" action="/view_history" method="POST" class="hidden">
+        <input type="hidden" name="history_data" id="historyDataInput">
+    </form>
+
+    <!-- Loading Overlay -->
+    <div id="loadingOverlay" class="fixed inset-0 bg-emerald-950/90 backdrop-blur-md z-50 hidden flex-col items-center justify-center text-stone-50 p-6 text-center">
+        <div class="relative w-24 h-24 mb-8">
+            <div class="absolute inset-0 border-4 border-emerald-500/20 rounded-full"></div>
+            <div class="absolute inset-0 border-4 border-emerald-500 rounded-full border-t-transparent animate-spin"></div>
+            <div class="absolute inset-0 flex items-center justify-center">
+                <i data-lucide="search" class="h-8 w-8 text-emerald-400"></i>
+            </div>
+        </div>
+        <h2 class="text-3xl font-serif font-bold mb-8 tracking-tight">Compliance Analysis in Progress</h2>
+        
+        <div class="w-full max-w-xs space-y-5 text-left font-mono text-sm">
+            <div id="step1" class="flex items-center gap-4 opacity-30 transition-all duration-500">
+                <div class="step-icon w-6 h-6 rounded-full border border-emerald-500/50 flex items-center justify-center shrink-0">
+                    <i data-lucide="check" class="h-3 w-3 text-emerald-500 hidden"></i>
+                    <div class="pulse-dot w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse"></div>
+                </div>
+                <span class="tracking-wide">Extracting label text...</span>
+            </div>
+            <div id="step2" class="flex items-center gap-4 opacity-30 transition-all duration-500">
+                <div class="step-icon w-6 h-6 rounded-full border border-emerald-500/50 flex items-center justify-center shrink-0">
+                    <i data-lucide="check" class="h-3 w-3 text-emerald-500 hidden"></i>
+                    <div class="pulse-dot w-1.5 h-1.5 bg-emerald-500 rounded-full hidden"></div>
+                </div>
+                <span class="tracking-wide">Identifying ingredients & claims...</span>
+            </div>
+            <div id="step3" class="flex items-center gap-4 opacity-30 transition-all duration-500">
+                <div class="step-icon w-6 h-6 rounded-full border border-emerald-500/50 flex items-center justify-center shrink-0">
+                    <i data-lucide="check" class="h-3 w-3 text-emerald-500 hidden"></i>
+                    <div class="pulse-dot w-1.5 h-1.5 bg-emerald-500 rounded-full hidden"></div>
+                </div>
+                <span class="tracking-wide">Cross-referencing NAFDAC regulations...</span>
+            </div>
+            <div id="step4" class="flex items-center gap-4 opacity-30 transition-all duration-500">
+                <div class="step-icon w-6 h-6 rounded-full border border-emerald-500/50 flex items-center justify-center shrink-0">
+                    <i data-lucide="check" class="h-3 w-3 text-emerald-500 hidden"></i>
+                    <div class="pulse-dot w-1.5 h-1.5 bg-emerald-500 rounded-full hidden"></div>
+                </div>
+                <span class="tracking-wide">Generating compliance report...</span>
+            </div>
+        </div>
+        <p class="mt-12 text-emerald-500/50 text-[10px] uppercase tracking-[0.2em] font-bold font-mono">Please do not refresh this page</p>
+    </div>
+
+    <footer class="bg-white/50 dark:bg-slate-900/50 backdrop-blur-sm border-t border-emerald-950/5 dark:border-slate-700/50 py-8 mt-auto transition-colors duration-300">
+        <div class="container mx-auto px-4 text-center">
+            <p class="text-emerald-950/40 dark:text-stone-50/40 text-xs font-mono">Developed by <span class="text-emerald-950/70 dark:text-stone-50/70 font-bold">Babagana, Shamsuddeen</span></p>
+            <p class="text-emerald-950/30 dark:text-stone-50/30 text-[9px] mt-2 uppercase tracking-widest font-mono font-bold">Official Compliance Tool v2.0</p>
+        </div>
+    </footer>
+
+    <script>
+        lucide.createIcons();
+
+        const fileInput = document.getElementById('file');
+        const fileNameDisplay = document.getElementById('fileNameDisplay');
+        const uploadForm = document.getElementById('uploadForm');
+        const loadingOverlay = document.getElementById('loadingOverlay');
+        const previewContainer = document.getElementById('previewContainer');
+        const imagePreview = document.getElementById('imagePreview');
+        const pdfPreview = document.getElementById('pdfPreview');
+        const uploadIconContainer = document.getElementById('uploadIconContainer');
+        const removeFileBtn = document.getElementById('removeFile');
+        const submitBtn = document.getElementById('submitBtn');
+        const errorMessage = document.getElementById('errorMessage');
+        const uploadHint = document.getElementById('uploadHint');
+
+        const MAX_SIZE = 10 * 1024 * 1024; // 10MB
+        const ALLOWED_TYPES = ['image/png', 'image/jpeg', 'image/jpg', 'application/pdf'];
+
+        fileInput.addEventListener('change', (e) => {
+            const file = e.target.files[0];
+            errorMessage.classList.add('hidden');
+            submitBtn.disabled = false;
+
+            if (file) {
+                // Validation
+                if (!ALLOWED_TYPES.includes(file.type)) {
+                    showError('Invalid file type. Please use PNG, JPG, or PDF.');
+                    return;
+                }
+                if (file.size > MAX_SIZE) {
+                    showError('File is too large. Maximum size is 10MB.');
+                    return;
+                }
+
+                fileNameDisplay.textContent = file.name;
+                fileNameDisplay.classList.add('text-emerald-700');
+                uploadHint.classList.add('hidden');
+                
+                // Handle Preview
+                const reader = new FileReader();
+                reader.onload = function(event) {
+                    if (file.type.startsWith('image/')) {
+                        imagePreview.src = event.target.result;
+                        imagePreview.classList.remove('hidden');
+                        pdfPreview.classList.add('hidden');
+                    } else if (file.type === 'application/pdf') {
+                        imagePreview.classList.add('hidden');
+                        pdfPreview.classList.remove('hidden');
+                    }
+                    
+                    previewContainer.classList.remove('hidden');
+                    uploadIconContainer.classList.add('hidden');
+                }
+                reader.readAsDataURL(file);
+            }
+        });
+
+        function showError(msg) {
+            errorMessage.textContent = msg;
+            errorMessage.classList.remove('hidden');
+            fileInput.value = '';
+            submitBtn.disabled = true;
+            fileNameDisplay.textContent = 'Select Label File';
+            previewContainer.classList.add('hidden');
+            uploadIconContainer.classList.remove('hidden');
+            uploadHint.classList.remove('hidden');
+        }
+
+        removeFileBtn.addEventListener('click', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            fileInput.value = '';
+            fileNameDisplay.textContent = 'Select Label File';
+            fileNameDisplay.classList.remove('text-emerald-700');
+            previewContainer.classList.add('hidden');
+            uploadIconContainer.classList.remove('hidden');
+            uploadHint.classList.remove('hidden');
+            errorMessage.classList.add('hidden');
+            submitBtn.disabled = false;
+        });
+
+        uploadForm.addEventListener('submit', () => {
+            loadingOverlay.classList.remove('hidden');
+            loadingOverlay.classList.add('flex');
+
+            const steps = [
+                { id: 'step1', delay: 0 },
+                { id: 'step2', delay: 2500 },
+                { id: 'step3', delay: 5500 },
+                { id: 'step4', delay: 8500 }
+            ];
+
+            steps.forEach((step, index) => {
+                setTimeout(() => {
+                    const el = document.getElementById(step.id);
+                    el.classList.remove('opacity-30');
+                    el.classList.add('opacity-100');
+                    
+                    if (index > 0) {
+                        const prevEl = document.getElementById(steps[index-1].id);
+                        prevEl.querySelector('.pulse-dot').classList.add('hidden');
+                        prevEl.querySelector('i').classList.remove('hidden');
+                    }
+                }, step.delay);
+            });
+        });
+
+        // Load History from LocalStorage
+        document.addEventListener('DOMContentLoaded', () => {
+            const history = JSON.parse(localStorage.getItem('nafdac_history') || '[]');
+            if (history.length > 0) {
+                document.getElementById('historySection').classList.remove('hidden');
+                const historyList = document.getElementById('historyList');
+                
+                history.forEach(item => {
+                    const date = new Date(item.timestamp).toLocaleDateString();
+                    const isCompliant = item.compliance_status === 'Compliant';
+                    const statusColor = isCompliant ? 'text-emerald-700 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-900/30 border-emerald-200 dark:border-emerald-800' : 'text-rose-700 dark:text-rose-400 bg-rose-50 dark:bg-rose-900/30 border-rose-200 dark:border-rose-800';
+                    const icon = isCompliant ? 'check-circle' : 'x-circle';
+                    
+                    const card = document.createElement('div');
+                    card.className = 'bg-white/80 dark:bg-slate-800/80 backdrop-blur-sm p-4 rounded-xl shadow-sm border border-emerald-950/10 dark:border-slate-700 hover:-translate-y-1 hover:shadow-lg hover:border-emerald-500/50 dark:hover:border-emerald-500/50 transition-all duration-300 cursor-pointer flex justify-between items-center group';
+                    card.onclick = () => {
+                        document.getElementById('historyDataInput').value = JSON.stringify(item);
+                        document.getElementById('historyForm').submit();
+                    };
+                    
+                    card.innerHTML = `
+                        <div class="flex items-center gap-3">
+                            <div class="w-10 h-10 rounded-lg bg-emerald-50 dark:bg-slate-700 border border-emerald-950/5 dark:border-slate-600 flex items-center justify-center group-hover:bg-emerald-100 dark:group-hover:bg-slate-600 transition-colors">
+                                <i data-lucide="file-text" class="h-5 w-5 text-emerald-600 dark:text-emerald-400 group-hover:text-emerald-700 dark:group-hover:text-emerald-300 transition-colors"></i>
+                            </div>
+                            <div>
+                                <p class="font-bold text-emerald-950 dark:text-stone-50 text-sm font-serif">${item.product_name}</p>
+                                <p class="text-[10px] text-emerald-950/50 dark:text-stone-50/50 uppercase tracking-widest font-bold mt-0.5 font-mono">${date}</p>
+                            </div>
+                        </div>
+                        <div class="px-3 py-1 rounded-full border text-[10px] uppercase tracking-wider font-bold flex items-center gap-1 font-mono ${statusColor}">
+                            <i data-lucide="${icon}" class="h-3 w-3"></i>
+                            ${item.compliance_status}
+                        </div>
+                    `;
+                    historyList.appendChild(card);
+                });
+                lucide.createIcons();
+            }
+        });
+        // Service Worker Registration for PWA
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('/sw.js')
+                    .then(registration => console.log('SW registered'))
+                    .catch(err => console.log('SW registration failed:', err));
+            });
+        }
+    </script>
+</body>
+</html>
